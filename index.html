@@ -1,0 +1,1919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flashcards</title>
+<style>
+  :root {
+    --bg: #1a1f2e;
+    --surface: #222839;
+    --surface2: #2a3145;
+    --border: #333d56;
+    --text: #e2e8f0;
+    --text-muted: #8897b4;
+    --accent: #4f8ef7;
+    --accent-hover: #6ba3ff;
+    --correct: #22c55e;
+    --wrong: #ef4444;
+    --correct-bg: rgba(34,197,94,0.12);
+    --wrong-bg: rgba(239,68,68,0.12);
+    --shadow: 0 4px 24px rgba(0,0,0,0.35);
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.2);
+    --radius: 10px;
+    --radius-sm: 6px;
+    --fs: 16px;
+    --transition: 0.18s ease;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: var(--fs);
+    line-height: 1.6;
+  }
+
+  /* ── SCREENS ── */
+  /* FIX #6: session uses body-level scroll, not overflow-y:auto on the screen
+     so sticky top-bar works correctly */
+  .screen { display: none; min-height: 100vh; }
+  .screen.active { display: flex; flex-direction: column; }
+
+  /* ── HOME SCREEN ── */
+  #home {
+    align-items: center;
+    justify-content: center;
+    padding: clamp(16px, 4vw, 48px);
+  }
+
+  .home-inner {
+    width: 100%;
+    max-width: 720px;
+  }
+
+  .home-title {
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+  }
+
+  .home-sub {
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    margin-bottom: 32px;
+  }
+
+  /* Subject tiles on home screen */
+  .subject-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+    gap: 16px;
+  }
+
+  .subject-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: clamp(20px, 3vw, 28px);
+    cursor: pointer;
+    transition: border-color var(--transition), transform var(--transition), box-shadow var(--transition);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+    text-align: left;
+    width: 100%;
+    color: var(--text);
+    font-family: inherit;
+  }
+
+  .subject-tile::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity var(--transition);
+  }
+
+  .subject-tile:hover, .subject-tile:focus-visible {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+    outline: none;
+  }
+
+  .subject-tile:hover::before, .subject-tile:focus-visible::before { opacity: 1; }
+
+  .subject-tile-name {
+    font-size: clamp(1.05rem, 2.5vw, 1.25rem);
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+
+  .subject-tile-meta {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .subject-tile-arrow {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    transition: color var(--transition), right var(--transition);
+  }
+
+  .subject-tile:hover .subject-tile-arrow { color: var(--accent); right: 16px; }
+
+  /* ── SUBJECT SCREEN ── */
+  #subject {
+    align-items: center;
+    padding: clamp(16px, 4vw, 48px);
+  }
+
+  .subject-inner {
+    width: 100%;
+    max-width: 720px;
+  }
+
+  .subject-screen-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
+  .back-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    font-family: inherit;
+  }
+
+  .back-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .subject-screen-title {
+    font-size: clamp(1.2rem, 3vw, 1.7rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .subject-section { margin-bottom: 32px; }
+
+  .subject-header {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .exam-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+    gap: 16px;
+  }
+
+  /* FIX #14: use <button> for exam tiles — keyboard accessible */
+  .exam-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: clamp(16px, 3vw, 24px);
+    cursor: pointer;
+    transition: border-color var(--transition), transform var(--transition), box-shadow var(--transition);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+    text-align: left;
+    width: 100%;
+    color: var(--text);
+    font-family: inherit;
+  }
+
+  .exam-tile::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity var(--transition);
+  }
+
+  .exam-tile:hover, .exam-tile:focus-visible {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+    outline: none;
+  }
+
+  .exam-tile:hover::before, .exam-tile:focus-visible::before { opacity: 1; }
+
+  .exam-tile-title {
+    font-size: clamp(1rem, 2vw, 1.15rem);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .exam-tile-meta {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .exam-tile-meta span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* ── SESSION SCREEN ── */
+  /* FIX #6: remove overflow-y:auto and height:100vh from #session.
+     Body scrolls naturally; top-bar is sticky relative to viewport. */
+  #session {
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  /* TOP BAR */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: clamp(8px, 2vw, 14px) clamp(12px, 3vw, 24px);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    gap: 12px;
+  }
+
+  .top-bar-left { display: flex; align-items: center; gap: 10px; min-width: 80px; }
+  .top-bar-center { display: flex; align-items: center; gap: 8px; }
+  .top-bar-right { display: flex; align-items: center; gap: 8px; min-width: 80px; justify-content: flex-end; }
+
+  .counter {
+    font-size: clamp(0.8rem, 2vw, 0.9rem);
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    padding: 3px 6px;
+    transition: border-color var(--transition), color var(--transition);
+  }
+  .counter:hover { border-color: var(--border); color: var(--text); }
+
+  .counter-jump {
+    display: none;
+    width: 72px;
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    outline: none;
+    -moz-appearance: textfield;
+  }
+  .counter-jump::-webkit-inner-spin-button,
+  .counter-jump::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .counter-jump.open { display: block; }
+
+  .fs-control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+  }
+
+  .fs-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    width: 26px; height: 26px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: background var(--transition), color var(--transition);
+    font-weight: 700;
+  }
+
+  .fs-btn:hover { background: var(--border); color: var(--text); }
+
+  .fs-val {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    min-width: 28px;
+    text-align: center;
+  }
+
+  .icon-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    transition: all var(--transition);
+    white-space: nowrap;
+  }
+
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .finish-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 5px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: all var(--transition);
+  }
+
+  .finish-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(79,142,247,0.06); }
+
+  /* CARD AREA */
+  .card-area {
+    flex: 1;
+    padding: clamp(16px, 4vw, 40px) clamp(12px, 4vw, 32px);
+    max-width: 860px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  /* FIX #12: question text uses font-size in px via var(--fs) so +/- control actually works */
+  .question-text {
+    font-size: var(--fs);
+    font-weight: 500;
+    line-height: 1.65;
+    margin-bottom: clamp(20px, 3vw, 32px);
+    color: var(--text);
+  }
+
+  /* CHOICES */
+  .choices {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: clamp(20px, 3vw, 28px);
+  }
+
+  .choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: clamp(10px, 2vw, 14px) clamp(12px, 2vw, 16px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: border-color var(--transition), background var(--transition), transform var(--transition);
+    box-shadow: var(--shadow-sm);
+    text-align: left;
+    width: 100%;
+    color: var(--text);
+    font-size: inherit;
+    line-height: 1.55;
+  }
+
+  .choice:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--surface2);
+    transform: translateX(2px);
+  }
+
+  .choice:disabled { cursor: default; transform: none; }
+
+  .choice-num {
+    flex-shrink: 0;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-top: 1px;
+    transition: background var(--transition), border-color var(--transition), color var(--transition);
+  }
+
+  .choice-text { flex: 1; }
+
+  /* FIX #3: correct = green, selected-wrong = red, unselected-others = dimmed neutral (not red) */
+  .choice.correct {
+    border-color: var(--correct);
+    background: var(--correct-bg);
+  }
+  .choice.correct .choice-num {
+    background: var(--correct);
+    border-color: var(--correct);
+    color: #fff;
+  }
+
+  .choice.wrong {
+    border-color: var(--wrong);
+    background: var(--wrong-bg);
+  }
+  .choice.wrong .choice-num {
+    background: var(--wrong);
+    border-color: var(--wrong);
+    color: #fff;
+  }
+
+  /* neutral dim for unselected choices after reveal */
+  .choice.neutral-dim {
+    opacity: 0.45;
+  }
+
+  /* QA CARD ANSWER */
+  .qa-answer {
+    display: none;
+    background: var(--surface2);
+    border-left: 3px solid var(--correct);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: clamp(10px, 2vw, 16px) clamp(12px, 2vw, 18px);
+    margin-bottom: clamp(20px, 3vw, 28px);
+    font-size: 1em;
+    color: var(--text);
+    line-height: 1.65;
+    animation: fadeIn 0.25s ease;
+  }
+  .qa-answer.visible { display: block; }
+  .qa-answer-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--correct);
+    margin-bottom: 6px;
+  }
+
+  /* EXPLANATION */
+  .explanation {
+    display: none;
+    background: var(--surface2);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: clamp(10px, 2vw, 14px) clamp(12px, 2vw, 16px);
+    margin-bottom: clamp(20px, 3vw, 28px);
+    font-size: 0.93em;
+    color: var(--text-muted);
+    line-height: 1.65;
+    animation: fadeIn 0.25s ease;
+  }
+
+  .explanation.visible { display: block; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  /* ACTION BUTTONS */
+  .action-btns {
+    display: flex;
+    gap: clamp(6px, 2vw, 12px);
+    flex-wrap: wrap;
+  }
+
+  .action-btn {
+    flex: 1;
+    min-width: 80px;
+    padding: clamp(10px, 2vw, 13px) clamp(10px, 2vw, 20px);
+    border-radius: var(--radius);
+    font-size: clamp(0.8rem, 1.8vw, 0.9rem);
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    position: relative;
+  }
+
+  .btn-next {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .btn-next:hover { background: var(--accent-hover); border-color: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(79,142,247,0.3); }
+  .btn-next:active { transform: none; }
+
+  .btn-forgot {
+    background: var(--surface);
+    color: var(--text-muted);
+    border-color: var(--border);
+  }
+  .btn-forgot:hover { border-color: #f59e0b; color: #f59e0b; background: rgba(245,158,11,0.06); transform: translateY(-1px); }
+  .btn-forgot:active { transform: none; }
+
+  /* FIX #9: Forgot flash feedback */
+  .btn-forgot.flash-forgot {
+    border-color: #f59e0b;
+    color: #f59e0b;
+    background: rgba(245,158,11,0.12);
+  }
+
+  .btn-disable {
+    background: var(--surface);
+    color: var(--text-muted);
+    border-color: var(--border);
+  }
+  .btn-disable:hover { border-color: var(--wrong); color: var(--wrong); background: rgba(239,68,68,0.06); transform: translateY(-1px); }
+  .btn-disable:active { transform: none; }
+
+  /* NAV ARROWS */
+  .nav-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: clamp(16px, 3vw, 24px);
+    padding-top: clamp(12px, 2vw, 16px);
+    border-top: 1px solid var(--border);
+  }
+
+  .nav-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 7px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: all var(--transition);
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .nav-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .nav-btn:disabled { opacity: 0.3; cursor: default; }
+
+  /* FIX #16: screen flash — both green (correct) and red (wrong), with smooth fade out */
+  .answer-flash {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 100;
+    transition: opacity 0.08s ease-in;
+  }
+  .answer-flash.show {
+    opacity: 1;
+    transition: opacity 0.08s ease-in;
+  }
+  .answer-flash.fade {
+    opacity: 0;
+    transition: opacity 0.4s ease-out;
+  }
+  .answer-flash.correct-flash { background: rgba(34,197,94,0.15); }
+  .answer-flash.wrong-flash   { background: rgba(239,68,68,0.15); }
+
+  /* ── SUMMARY SCREEN ── */
+  /* FIX #10: summary is scrollable */
+  #summary {
+    align-items: center;
+    padding: clamp(16px, 4vw, 48px);
+    overflow-y: auto;
+  }
+
+  .summary-inner {
+    width: 100%;
+    max-width: 720px;
+  }
+
+  .summary-title {
+    font-size: clamp(1.3rem, 3vw, 1.8rem);
+    font-weight: 700;
+    margin-bottom: 24px;
+    letter-spacing: -0.02em;
+  }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    text-align: center;
+  }
+
+  .stat-num {
+    font-size: clamp(1.5rem, 4vw, 2.2rem);
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .stat-answered .stat-num { color: var(--accent); }
+  .stat-correct .stat-num { color: var(--correct); }
+  .stat-missed .stat-num { color: var(--wrong); }
+  .stat-disabled .stat-num { color: var(--text-muted); }
+
+  .missed-section {
+    margin-bottom: 32px;
+  }
+
+  .missed-section-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  /* FIX #10: remove max-height cap on missed list — summary screen itself scrolls */
+  .missed-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-right: 4px;
+  }
+
+  .missed-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--wrong);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+
+  .missed-q { font-size: 0.9rem; margin-bottom: 8px; }
+  .missed-answer {
+    font-size: 0.82rem;
+    color: var(--correct);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .missed-explanation {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .summary-btns {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .summary-btn {
+    flex: 1;
+    min-width: 110px;
+    padding: 12px 20px;
+    border-radius: var(--radius);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    transition: all var(--transition);
+  }
+
+  .summary-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: rgba(79,142,247,0.06); transform: translateY(-1px); }
+  .summary-btn:disabled { opacity: 0.35; cursor: default; transform: none; }
+  .summary-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .summary-btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+  /* ── MODAL (keyboard legend) ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: clamp(20px, 4vw, 32px);
+    max-width: 420px;
+    width: 100%;
+    box-shadow: var(--shadow);
+  }
+
+  .modal-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+
+  .shortcut-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+
+  .shortcut-table tr + tr td { border-top: 1px solid var(--border); }
+  .shortcut-table td { padding: 8px 4px; }
+  .shortcut-table td:first-child { color: var(--text-muted); }
+  .shortcut-table td:last-child { text-align: right; }
+
+  .kbd {
+    display: inline-block;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.75rem;
+    font-family: monospace;
+    color: var(--accent);
+  }
+
+  .modal-close {
+    margin-top: 16px;
+    width: 100%;
+    padding: 9px;
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all var(--transition);
+  }
+
+  .modal-close:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* FIX #18: top-bar tooltips point downward so they don't go off-screen */
+  .top-bar [data-tip]::after {
+    bottom: auto;
+    top: calc(100% + 6px);
+  }
+
+  /* TOOLTIP */
+  [data-tip] { position: relative; }
+  [data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0d1117;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    white-space: nowrap;
+    padding: 4px 8px;
+    border-radius: 4px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    border: 1px solid var(--border);
+    z-index: 50;
+  }
+  [data-tip]:hover::after { opacity: 1; }
+
+  /* RESUME PROMPT on exam tile */
+  .resume-prompt {
+    display: none;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    gap: 8px;
+    flex-direction: column;
+  }
+  .resume-prompt.open { display: flex; }
+  .resume-prompt-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  .resume-prompt-btns { display: flex; gap: 8px; }
+  .resume-btn {
+    flex: 1;
+    padding: 7px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    transition: all var(--transition);
+  }
+  .resume-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .resume-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .resume-btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+  /* STAR BUTTON */
+  .star-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.3rem;
+    line-height: 1;
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    transition: transform 0.15s ease, opacity 0.15s ease;
+    opacity: 0.35;
+    color: #f59e0b;
+  }
+  .star-btn:hover { opacity: 0.7; transform: scale(1.15); }
+  .star-btn.starred { opacity: 1; }
+  .star-btn.starred:hover { transform: scale(1.15); }
+
+  /* STARRED TILE on home */
+  .starred-tile {
+    background: linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.03));
+    border-color: rgba(245,158,11,0.35) !important;
+  }
+  .starred-tile::before { background: #f59e0b !important; }
+  .starred-tile:hover, .starred-tile:focus-visible { border-color: #f59e0b !important; }
+  .starred-tile-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78rem;
+    color: #f59e0b;
+    font-weight: 600;
+  }
+
+  /* FAST MOVE TOGGLE */
+  .fast-move-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 3px 8px 3px 6px;
+    cursor: pointer;
+    transition: border-color var(--transition);
+    font-family: inherit;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .fast-move-toggle:hover { border-color: var(--accent); }
+  .fast-move-toggle.on { border-color: var(--accent); color: var(--accent); background: rgba(79,142,247,0.08); }
+
+  .toggle-pip {
+    width: 28px; height: 15px;
+    border-radius: 8px;
+    background: var(--border);
+    position: relative;
+    transition: background var(--transition);
+    flex-shrink: 0;
+  }
+  .toggle-pip::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: transform var(--transition), background var(--transition);
+  }
+  .fast-move-toggle.on .toggle-pip { background: var(--accent); }
+  .fast-move-toggle.on .toggle-pip::after { transform: translateX(13px); background: #fff; }
+
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<!-- ══ HOME ══ -->
+<div id="home" class="screen active">
+  <div class="home-inner">
+    <div class="home-title">Flashcards</div>
+    <div class="home-sub">Select a subject to begin</div>
+    <div id="subjectGrid" class="subject-grid"></div>
+  </div>
+</div>
+
+<!-- ══ SUBJECT ══ -->
+<div id="subject" class="screen">
+  <div class="subject-inner">
+    <div class="subject-screen-header">
+      <button class="back-btn" onclick="goHome()">← Home</button>
+      <div class="subject-screen-title" id="subjectTitle"></div>
+    </div>
+    <div id="subjectExamGrid"></div>
+  </div>
+</div>
+
+<!-- ══ SESSION ══ -->
+<div id="session" class="screen">
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <button class="counter" id="counter" data-tip="Click to jump to question" onclick="openJump()">1/20</button>
+      <input class="counter-jump" id="counterJump" type="number" min="1" placeholder="Go to…"
+        onblur="closeJump()" onkeydown="jumpKeydown(event)" />
+    </div>
+    <div class="top-bar-center">
+      <div class="fs-control">
+        <button class="fs-btn" id="fsDown" data-tip="Smaller text" onclick="changeFontSize(-1)">−</button>
+        <span class="fs-val" id="fsVal">16</span>
+        <button class="fs-btn" id="fsUp" data-tip="Larger text" onclick="changeFontSize(1)">+</button>
+      </div>
+      <button class="fast-move-toggle" id="fastMoveBtn" data-tip="Reveal + advance in one click" onclick="toggleFastMove()">
+        <span class="toggle-pip"></span>Fast
+      </button>
+    </div>
+    <div class="top-bar-right">
+      <button class="star-btn" id="starBtn" data-tip="Star this card  [S]" onclick="toggleStar()">★</button>
+      <button class="finish-btn" onclick="goToSummary()" data-tip="End session">Finish</button>
+      <button class="icon-btn" onclick="goBack()" data-tip="Back to subject">✕</button>
+      <button class="icon-btn" onclick="openModal()" data-tip="Keyboard shortcuts">?</button>
+    </div>
+  </div>
+
+  <div class="card-area">
+    <div class="question-text" id="questionText"></div>
+    <div class="qa-answer" id="qaAnswer"><div class="qa-answer-label">Answer</div><div id="qaAnswerText"></div></div>
+    <div class="choices" id="choices"></div>
+    <div class="explanation" id="explanation"></div>
+    <div class="action-btns">
+      <button class="action-btn btn-forgot" id="btnForgot" data-tip="Repeat in 5  [Num 0]" onclick="handleForgot()">Forgot</button>
+      <button class="action-btn btn-disable" id="btnDisable" data-tip="Disable forever  [Num .]" onclick="handleDisable()">Disable</button>
+      <button class="action-btn btn-next" id="btnNext" data-tip="Reveal / Next  [Enter]" onclick="handleNext()">Next</button>
+    </div>
+    <div class="nav-row">
+      <button class="nav-btn" id="btnBack" data-tip="Previous  [←]" onclick="navigate(-1)">← Back</button>
+      <button class="nav-btn" id="btnForward" data-tip="Next  [→]" onclick="navigate(1)">Forward →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SUMMARY ══ -->
+<div id="summary" class="screen">
+  <div class="summary-inner">
+    <div class="summary-title">Session Complete</div>
+    <div class="stats-row">
+      <div class="stat-card stat-answered"><div class="stat-num" id="statAnswered">0</div><div class="stat-label">Answered</div></div>
+      <div class="stat-card stat-correct"><div class="stat-num" id="statCorrect">0</div><div class="stat-label">Correct</div></div>
+      <div class="stat-card stat-missed"><div class="stat-num" id="statMissed">0</div><div class="stat-label">Missed</div></div>
+      <div class="stat-card stat-disabled"><div class="stat-num" id="statDisabled">0</div><div class="stat-label">Disabled</div></div>
+    </div>
+    <div class="missed-section" id="missedSection">
+      <div class="missed-section-title">Missed Questions</div>
+      <div class="missed-list" id="missedList"></div>
+    </div>
+    <div class="summary-btns">
+      <button class="summary-btn" onclick="goBack()">← Exams</button>
+      <button class="summary-btn primary" onclick="goHome()">Home</button>
+      <button class="summary-btn" id="btnRepeatMissed" onclick="repeatMissed()">Repeat Missed</button>
+      <button class="summary-btn" onclick="repeatAll()">Repeat All</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ANSWER FLASH (correct = green, wrong = red) ══ -->
+<div class="answer-flash" id="answerFlash"></div>
+
+<!-- ══ KEYBOARD MODAL ══ -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-title">Keyboard Shortcuts</div>
+    <table class="shortcut-table">
+      <tr><td>Select choice 1–4</td><td><span class="kbd">Num 1–4</span> <span style="color:var(--text-muted);font-size:0.8em">or</span> <span class="kbd">O</span><span class="kbd">P</span><span class="kbd">[</span><span class="kbd">]</span></td></tr>
+      <tr><td>Reveal / Next</td><td><span class="kbd">Num Enter</span> <span style="color:var(--text-muted);font-size:0.8em">or</span> <span class="kbd">Enter</span></td></tr>
+      <tr><td>Forgot</td><td><span class="kbd">Num 0</span> <span style="color:var(--text-muted);font-size:0.8em">or</span> <span class="kbd">'</span></td></tr>
+      <tr><td>Disable</td><td><span class="kbd">Num .</span> <span style="color:var(--text-muted);font-size:0.8em">or</span> <span class="kbd">;</span></td></tr>
+      <tr><td>Back</td><td><span class="kbd">←</span></td></tr>
+      <tr><td>Forward</td><td><span class="kbd">→</span></td></tr>
+      <tr><td>Finish session</td><td><span class="kbd">End</span></td></tr>
+      <tr><td>Star / unstar card</td><td><span class="kbd">S</span></td></tr>
+    </table>
+    <button class="modal-close" onclick="closeModal()">Close</button>
+  </div>
+</div>
+
+<script>
+
+
+
+// ════════════════════════════════════════════════
+//  PARSER
+// ════════════════════════════════════════════════
+function parseRaw(raw) {
+  const lines = raw.split('\n');
+  const cards = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    if (!line) { i++; continue; }
+
+    // T/F card — must check before MCQ since :: won't match >>
+    const tfMatch = line.match(/^(.+?)\s*::\s*(T|F|True|False)\s*$/i);
+    if (tfMatch) {
+      const q = tfMatch[1].trim();
+      const ans = tfMatch[2].toUpperCase().startsWith('T');
+      i++;
+      let explanation = '';
+      while (i < lines.length) {
+        const el = lines[i];
+        const trimmed = el.trim();
+        if (!trimmed) { i++; break; }
+        if ((el.match(/^\s{2,}\*\s/) || el.match(/^\t\*/))) {
+          explanation = trimmed.replace(/^\*\s*/, '');
+          i++; break;
+        }
+        break;
+      }
+      cards.push({ type: 'tf', q, answer: ans, explanation });
+      continue;
+    }
+
+    // QA card — question→answer (arrow separator, no choices)
+    const qaMatch = line.match(/^(.+?)\s*[→\->]+\s*(.+)$/);
+    if (qaMatch && !line.includes('>> A)') && !line.includes(':: ')) {
+      cards.push({ type: 'qa', q: qaMatch[1].trim(), answer: qaMatch[2].trim(), explanation: '' });
+      i++;
+      continue;
+    }
+
+    // MCQ card
+    const mcqMatch = line.match(/^(.+?)\s*>>\s*[A-Za-z]\)\s*$/);
+    if (mcqMatch) {
+      const q = mcqMatch[1].trim();
+      i++;
+      const choices = [];
+      let explanation = '';
+      while (i < lines.length) {
+        const el = lines[i];
+        const trimmed = el.trim();
+        // Skip blank lines — choices may be separated from question by a blank line
+        if (!trimmed) {
+          // If we already have choices, a blank line ends the block
+          if (choices.length) { i++; break; }
+          // Otherwise keep scanning (blank line before first choice)
+          i++; continue;
+        }
+        if ((el.startsWith('    ') || el.startsWith('\t')) && trimmed.startsWith('* ')) {
+          explanation = trimmed.slice(2);
+          i++; break;
+        }
+        if (trimmed.startsWith('* ')) {
+          choices.push(trimmed.slice(2));
+          i++; continue;
+        }
+        break;
+      }
+      if (choices.length) cards.push({ type: 'mcq', q, choices, explanation });
+      continue;
+    }
+    i++;
+  }
+  return cards;
+}
+
+// ════════════════════════════════════════════════
+//  EXAM FILE LIST — add one line per exam file
+// ════════════════════════════════════════════════
+// Exam files are listed in manifest.json — edit that file to add/remove exams
+
+function buildExams(rawList) {
+  return rawList.map((e, idx) => ({
+    id: idx,
+    title: e.title,
+    subject: e.subject || 'General',
+    cards: parseRaw(e.raw)
+  }));
+}
+
+// ════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════
+let EXAMS = [];
+
+let currentExam    = null;
+let currentExamIdx = null;
+let queue        = [];   // [{ origIdx, choices[], _repeat? }]
+let queuePos     = 0;
+// FIX #1: track the "base" queue length (original cards, no repeats) for counter
+let baseQueueLen = 0;
+let session      = { answered: new Set(), correct: new Set(), wrong: new Set() };
+let cardState    = {};   // origIdx -> { revealed, selectedChoice }
+let disabledCards = {};  // examId  -> Set<origIdx>
+
+// ── persistence helpers ──
+function getDisabled(examId) {
+  if (!disabledCards[examId]) {
+    const saved = localStorage.getItem(`disabled_${examId}`);
+    disabledCards[examId] = saved ? new Set(JSON.parse(saved)) : new Set();
+  }
+  return disabledCards[examId];
+}
+function saveDisabled(examId) {
+  localStorage.setItem(`disabled_${examId}`, JSON.stringify([...disabledCards[examId]]));
+}
+
+// ════════════════════════════════════════════════
+//  STARRED CARDS
+// ════════════════════════════════════════════════
+const starredCards = {};
+function getStarred(examId) {
+  if (!starredCards[examId]) {
+    const saved = localStorage.getItem(`starred_${examId}`);
+    starredCards[examId] = saved ? new Set(JSON.parse(saved)) : new Set();
+  }
+  return starredCards[examId];
+}
+function saveStarred(examId) {
+  localStorage.setItem(`starred_${examId}`, JSON.stringify([...starredCards[examId]]));
+}
+
+// ════════════════════════════════════════════════
+//  SESSION PERSISTENCE
+// ════════════════════════════════════════════════
+function saveSession(examIdx) {
+  const data = {
+    examIdx,
+    queuePos,
+    queue,
+    cardState,
+    session: {
+      answered: [...session.answered],
+      correct:  [...session.correct],
+      wrong:    [...session.wrong],
+    },
+    baseQueueLen,
+  };
+  localStorage.setItem(`session_${examIdx}`, JSON.stringify(data));
+}
+
+function loadSession(examIdx) {
+  try {
+    const raw = localStorage.getItem(`session_${examIdx}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function clearSession(examIdx) {
+  localStorage.removeItem(`session_${examIdx}`);
+}
+function toggleStar() {
+  if (!currentExam) return;
+  const examIdx = EXAMS.indexOf(currentExam);
+  const entry   = queue[queuePos];
+  if (!entry) return;
+  const origIdx = entry.origIdx;
+  const starred = getStarred(examIdx);
+  if (starred.has(origIdx)) {
+    starred.delete(origIdx);
+  } else {
+    starred.add(origIdx);
+  }
+  saveStarred(examIdx);
+  updateStarBtn(examIdx, origIdx);
+}
+function updateStarBtn(examIdx, origIdx) {
+  const btn = document.getElementById('starBtn');
+  const isStarred = getStarred(examIdx).has(origIdx);
+  btn.classList.toggle('starred', isStarred);
+  btn.title = isStarred ? 'Unstar this card' : 'Star this card';
+}
+function startStarredOnly(examIdx) {
+  const exam    = EXAMS[examIdx];
+  const starred = getStarred(examIdx);
+  const disabled = getDisabled(examIdx);
+  const indices = [...starred].filter(i => !disabled.has(i));
+  if (indices.length === 0) return;
+  startExam(examIdx, indices);
+}
+
+// ════════════════════════════════════════════════
+//  FONT SIZE
+// ════════════════════════════════════════════════
+let currentFs = parseInt(localStorage.getItem('flashcard_fs') || '16');
+
+function applyFontSize() {
+  document.documentElement.style.setProperty('--fs', currentFs + 'px');
+  document.getElementById('fsVal').textContent = currentFs;
+}
+function changeFontSize(delta) {
+  currentFs = Math.max(12, Math.min(28, currentFs + delta));
+  localStorage.setItem('flashcard_fs', currentFs);
+  applyFontSize();
+}
+applyFontSize();
+
+// ════════════════════════════════════════════════
+//  JUMP TO QUESTION
+// ════════════════════════════════════════════════
+function openJump() {
+  const counter = document.getElementById('counter');
+  const input   = document.getElementById('counterJump');
+  counter.style.display = 'none';
+  input.classList.add('open');
+  input.value = '';
+  input.max   = queue.length;
+  input.focus();
+}
+function closeJump() {
+  const counter = document.getElementById('counter');
+  const input   = document.getElementById('counterJump');
+  input.classList.remove('open');
+  counter.style.display = '';
+}
+function jumpKeydown(e) {
+  if (e.key === 'Enter') {
+    const n = parseInt(document.getElementById('counterJump').value);
+    closeJump();
+    if (!isNaN(n) && n >= 1 && n <= queue.length) {
+      queuePos = n - 1;
+      // reset card state so it's interactive
+      delete cardState[queue[queuePos].origIdx];
+      renderCard();
+    }
+  } else if (e.key === 'Escape') {
+    closeJump();
+  }
+}
+
+// ════════════════════════════════════════════════
+//  HOME SCREEN — subject tiles
+// ════════════════════════════════════════════════
+function renderHome() {
+  const container = document.getElementById('subjectGrid');
+  container.innerHTML = '';
+
+  // Group exams by subject
+  const subjects = {};
+  EXAMS.forEach((exam, idx) => {
+    if (!subjects[exam.subject]) subjects[exam.subject] = [];
+    subjects[exam.subject].push({ exam, idx });
+  });
+
+  Object.entries(subjects).forEach(([subject, entries]) => {
+    // Count totals for the subject
+    let totalActive = 0, totalStarred = 0, hasResume = false;
+    entries.forEach(({ exam, idx }) => {
+      const disabled = getDisabled(idx);
+      const starred  = getStarred(idx);
+      totalActive  += exam.cards.length - disabled.size;
+      totalStarred += [...starred].filter(i => !disabled.has(i)).length;
+      if (loadSession(idx)) hasResume = true;
+    });
+
+    const tile = document.createElement('button');
+    tile.className = 'subject-tile';
+    tile.innerHTML = `
+      <div class="subject-tile-name">${subject}</div>
+      <div class="subject-tile-meta">
+        <span>${entries.length} exam${entries.length !== 1 ? 's' : ''}</span>
+        <span>${totalActive} question${totalActive !== 1 ? 's' : ''}</span>
+        ${totalStarred ? `<span class="starred-tile-badge">★ ${totalStarred} starred</span>` : ''}
+        ${hasResume ? `<span style="color:var(--accent)">↩ in progress</span>` : ''}
+      </div>
+      <span class="subject-tile-arrow">›</span>`;
+    tile.onclick = () => goSubject(subject);
+    container.appendChild(tile);
+  });
+}
+
+// ════════════════════════════════════════════════
+//  SUBJECT SCREEN — exam tiles for one subject
+// ════════════════════════════════════════════════
+function goSubject(subject) {
+  document.getElementById('subjectTitle').textContent = subject;
+  renderSubject(subject);
+  showScreen('subject');
+}
+
+function renderSubject(subject) {
+  const container = document.getElementById('subjectExamGrid');
+  container.innerHTML = '';
+
+  const entries = [];
+  EXAMS.forEach((exam, idx) => {
+    if (exam.subject === subject) entries.push({ exam, idx });
+  });
+
+  const grid = document.createElement('div');
+  grid.className = 'exam-grid';
+
+  entries.forEach(({ exam, idx }) => {
+    const disabled = getDisabled(idx);
+    const starred  = getStarred(idx);
+    const active   = exam.cards.length - disabled.size;
+    const starredActive = [...starred].filter(i => !disabled.has(i)).length;
+
+    const saved = loadSession(idx);
+    const resumeInfo = saved ? `Question ${saved.queuePos + 1} of ${saved.baseQueueLen}` : null;
+
+    // Regular exam tile
+    const tile = document.createElement('button');
+    tile.className = 'exam-tile';
+    tile.innerHTML = `
+      <div class="exam-tile-title">${exam.title}</div>
+      <div class="exam-tile-meta">
+        <span>${active} active question${active !== 1 ? 's' : ''}</span>
+        ${disabled.size ? `<span>${disabled.size} disabled</span>` : ''}
+        ${starredActive ? `<span class="starred-tile-badge">★ ${starredActive} starred</span>` : ''}
+        ${resumeInfo ? `<span style="color:var(--accent)">↩ ${resumeInfo}</span>` : ''}
+      </div>
+      ${resumeInfo ? `
+      <div class="resume-prompt open" id="resumePrompt_${idx}">
+        <div class="resume-prompt-label">You left off at question ${saved.queuePos + 1} — continue where you left off?</div>
+        <div class="resume-prompt-btns">
+          <button class="resume-btn primary" data-resume="${idx}">Continue</button>
+          <button class="resume-btn" data-fresh="${idx}">Start fresh</button>
+        </div>
+      </div>` : ''}`;
+
+    tile.onclick = (e) => {
+      const resumeBtn = e.target.closest('[data-resume]');
+      const freshBtn  = e.target.closest('[data-fresh]');
+      if (resumeBtn) { e.stopPropagation(); resumeSession(parseInt(resumeBtn.dataset.resume)); return; }
+      if (freshBtn)  { e.stopPropagation(); clearSession(parseInt(freshBtn.dataset.fresh)); startExam(parseInt(freshBtn.dataset.fresh)); return; }
+      if (!saved) startExam(idx);
+    };
+    grid.appendChild(tile);
+
+    // Starred-only tile
+    if (starredActive > 0) {
+      const stile = document.createElement('button');
+      stile.className = 'exam-tile starred-tile';
+      stile.innerHTML = `
+        <div class="exam-tile-title">★ ${exam.title} — Starred</div>
+        <div class="exam-tile-meta">
+          <span>${starredActive} starred question${starredActive !== 1 ? 's' : ''}</span>
+        </div>`;
+      stile.onclick = () => startStarredOnly(idx);
+      grid.appendChild(stile);
+    }
+  });
+
+  container.appendChild(grid);
+}
+
+// ════════════════════════════════════════════════
+//  SESSION START
+// ════════════════════════════════════════════════
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function buildQueue(exam, indices) {
+  return indices.map(origIdx => {
+    const card = exam.cards[origIdx];
+    let choices;
+    if (card.type === 'mcq') choices = shuffle([...card.choices]);
+    else if (card.type === 'tf') choices = ['True', 'False'];
+    else choices = []; // qa — no choices
+    return { origIdx, choices };
+  });
+}
+
+function startExam(examIdx, includedIndices = null) {
+  currentExam = EXAMS[examIdx];
+  currentExamIdx = examIdx;
+  const disabled = getDisabled(examIdx);
+  if (!includedIndices) {
+    includedIndices = currentExam.cards.map((_, i) => i).filter(i => !disabled.has(i));
+  }
+  clearSession(examIdx);
+  queue        = buildQueue(currentExam, includedIndices);
+  baseQueueLen = queue.length;
+  queuePos     = 0;
+  session      = { answered: new Set(), correct: new Set(), wrong: new Set() };
+  cardState    = {};
+  showScreen('session');
+  renderCard();
+}
+
+function resumeSession(examIdx) {
+  const data = loadSession(examIdx);
+  if (!data) { startExam(examIdx); return; }
+  currentExam    = EXAMS[examIdx];
+  currentExamIdx = examIdx;
+  queue          = data.queue;
+  queuePos       = data.queuePos;
+  baseQueueLen   = data.baseQueueLen;
+  cardState      = data.cardState;
+  session = {
+    answered: new Set(data.session.answered),
+    correct:  new Set(data.session.correct),
+    wrong:    new Set(data.session.wrong),
+  };
+  showScreen('session');
+  renderCard();
+}
+
+// ════════════════════════════════════════════════
+//  RENDER CARD
+// ════════════════════════════════════════════════
+function correctTextFor(card) {
+  if (card.type === 'mcq') return card.choices[0];
+  if (card.type === 'tf')  return card.answer ? 'True' : 'False';
+  return card.answer; // qa
+}
+
+function renderCard() {
+  if (queuePos >= queue.length) { goToSummary(); return; }
+
+  const entry  = queue[queuePos];
+  const { origIdx, choices } = entry;
+  const card   = currentExam.cards[origIdx];
+  const state  = cardState[origIdx] || { revealed: false, selectedChoice: null };
+  cardState[origIdx] = state;
+
+  // FIX #1: counter uses baseQueueLen, not live queue.length
+  document.getElementById('counter').textContent = `${queuePos + 1} / ${baseQueueLen}`;
+
+  // question
+  document.getElementById('questionText').textContent = card.q;
+
+  // qa answer panel
+  const qaEl = document.getElementById('qaAnswer');
+  const qaTextEl = document.getElementById('qaAnswerText');
+  if (card.type === 'qa') {
+    qaTextEl.textContent = card.answer;
+    qaEl.classList.toggle('visible', state.revealed);
+  } else {
+    qaEl.classList.remove('visible');
+  }
+
+  // choices (mcq / tf only)
+  const choicesEl  = document.getElementById('choices');
+  choicesEl.innerHTML = '';
+  const correctText = correctTextFor(card);
+
+  choices.forEach((text, ci) => {
+    const btn = document.createElement('button');
+    btn.className = 'choice';
+    btn.disabled  = state.revealed;
+    btn.innerHTML = `<span class="choice-num">${ci + 1}</span><span class="choice-text">${text}</span>`;
+
+    if (state.revealed) {
+      if (text === correctText) {
+        btn.classList.add('correct');
+      } else if (state.selectedChoice && text === state.selectedChoice) {
+        // FIX #3: only the actually-selected wrong choice turns red
+        btn.classList.add('wrong');
+      } else {
+        // FIX #3: everything else dims neutrally, not red
+        btn.classList.add('neutral-dim');
+      }
+    } else {
+      btn.onclick = () => selectChoice(text, correctText, origIdx);
+    }
+    choicesEl.appendChild(btn);
+  });
+
+  // explanation
+  // FIX #17: only auto-scroll on fresh reveal, not on every renderCard
+  const expEl = document.getElementById('explanation');
+  expEl.textContent = card.explanation || '';
+  if (state.revealed && card.explanation) {
+    expEl.classList.add('visible');
+  } else {
+    expEl.classList.remove('visible');
+  }
+
+  // nav buttons
+  document.getElementById('btnBack').disabled    = queuePos === 0;
+  document.getElementById('btnForward').disabled = queuePos >= queue.length - 1;
+
+  // star button
+  const examIdx = EXAMS.indexOf(currentExam);
+  updateStarBtn(examIdx, origIdx);
+
+  // persist session
+  if (currentExamIdx !== null) saveSession(currentExamIdx);
+}
+
+// ════════════════════════════════════════════════
+//  CHOICE SELECTION
+// ════════════════════════════════════════════════
+function selectChoice(text, correctText, origIdx) {
+  const state = cardState[origIdx];
+  if (state.revealed) return;
+
+  state.selectedChoice = text;
+  state.revealed       = true;
+  session.answered.add(origIdx);
+
+  if (text === correctText) {
+    session.correct.add(origIdx);
+    session.wrong.delete(origIdx);
+    triggerFlash('correct');
+  } else {
+    session.wrong.add(origIdx);
+    session.correct.delete(origIdx);
+    triggerFlash('wrong'); // FIX: red flash on wrong answer
+  }
+
+  renderCard();
+  // FIX #17: scroll explanation into view only on fresh reveal
+  if (card_explanation_exists(origIdx)) {
+    setTimeout(() => {
+      document.getElementById('explanation').scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, 60);
+  }
+}
+
+function card_explanation_exists(origIdx) {
+  return !!currentExam.cards[origIdx].explanation;
+}
+
+// ════════════════════════════════════════════════
+//  FAST MOVE
+// ════════════════════════════════════════════════
+let fastMove = false;
+
+function toggleFastMove() {
+  fastMove = !fastMove;
+  document.getElementById('fastMoveBtn').classList.toggle('on', fastMove);
+}
+
+// ════════════════════════════════════════════════
+//  NEXT BUTTON
+// ════════════════════════════════════════════════
+function handleNext() {
+  const entry  = queue[queuePos];
+  const { origIdx } = entry;
+  const card   = currentExam.cards[origIdx];
+  const state  = cardState[origIdx] || { revealed: false, selectedChoice: null };
+  cardState[origIdx] = state;
+
+  if (!state.revealed) {
+    // Reveal the card
+    state.revealed       = true;
+    state.selectedChoice = null; // null = revealed via Next, not a choice pick
+    session.answered.add(origIdx);
+    // Not added to correct or wrong — it's a skip/reveal
+    // No scroll: user is skimming, keep position stable
+    renderCard();
+
+    if (fastMove) {
+      // Brief pause so user can see the answer, then advance
+      setTimeout(() => advance(), 300);
+    }
+  } else {
+    advance();
+  }
+}
+
+function advance() {
+  if (queuePos >= queue.length - 1) {
+    goToSummary();
+  } else {
+    queuePos++;
+    renderCard();
+  }
+}
+
+// ════════════════════════════════════════════════
+//  FORGOT
+// ════════════════════════════════════════════════
+function handleForgot() {
+  const entry    = queue[queuePos];
+  const { origIdx } = entry;
+
+  // Mark as wrong/missed
+  session.wrong.add(origIdx);
+  session.correct.delete(origIdx);
+  session.answered.add(origIdx);
+
+  // FIX #5: remove ALL future repeat instances of this card, then insert one fresh
+  for (let i = queue.length - 1; i > queuePos; i--) {
+    if (queue[i].origIdx === origIdx && queue[i]._repeat) queue.splice(i, 1);
+  }
+
+  // Insert 5 positions ahead of current (after advance we move +1, so net = +5 from current)
+  const insertAt = queuePos + 5 + 1;
+  const repeatEntry = { origIdx, choices: shuffle([...currentExam.cards[origIdx].choices || ['True','False']]), _repeat: true };
+
+  // For T/F, choices are always ['True','False']
+  if (currentExam.cards[origIdx].type === 'tf') {
+    repeatEntry.choices = ['True', 'False'];
+  } else {
+    repeatEntry.choices = shuffle([...currentExam.cards[origIdx].choices]);
+  }
+
+  if (insertAt >= queue.length) {
+    queue.push(repeatEntry);
+  } else {
+    queue.splice(insertAt, 0, repeatEntry);
+  }
+
+  // Reset state so card is fresh when it reappears
+  delete cardState[origIdx];
+
+  // FIX #9: brief visual feedback on Forgot button
+  const btn = document.getElementById('btnForgot');
+  btn.classList.add('flash-forgot');
+  setTimeout(() => btn.classList.remove('flash-forgot'), 400);
+
+  advance();
+}
+
+// ════════════════════════════════════════════════
+//  DISABLE
+// ════════════════════════════════════════════════
+function handleDisable() {
+  const entry    = queue[queuePos];
+  const { origIdx } = entry;
+  const examId   = currentExam.id;
+
+  getDisabled(examId).add(origIdx);
+  saveDisabled(examId);
+
+  // Remove all future occurrences (repeat or original)
+  for (let i = queue.length - 1; i > queuePos; i--) {
+    if (queue[i].origIdx === origIdx) queue.splice(i, 1);
+  }
+  // Remove current card from queue
+  queue.splice(queuePos, 1);
+
+  if (queue.length === 0) { goToSummary(); return; }
+  if (queuePos >= queue.length) queuePos = queue.length - 1;
+  renderCard();
+}
+
+// ════════════════════════════════════════════════
+//  NAVIGATE
+// ════════════════════════════════════════════════
+function navigate(delta) {
+  const newPos = queuePos + delta;
+  if (newPos < 0 || newPos >= queue.length) return;
+
+  const targetEntry = queue[newPos];
+  const examId      = currentExam.id;
+
+  // Re-enable disabled card if navigating to it
+  if (getDisabled(examId).has(targetEntry.origIdx)) {
+    getDisabled(examId).delete(targetEntry.origIdx);
+    saveDisabled(examId);
+  }
+
+  // FIX #2: reset card state on ALL navigation (back AND forward), making it interactive
+  delete cardState[targetEntry.origIdx];
+
+  queuePos = newPos;
+  renderCard();
+}
+
+// ════════════════════════════════════════════════
+//  ANSWER FLASH  (FIX #16 + new wrong flash)
+// ════════════════════════════════════════════════
+let flashTimer = null;
+function triggerFlash(type) {
+  const el = document.getElementById('answerFlash');
+  if (flashTimer) clearTimeout(flashTimer);
+
+  el.className = `answer-flash ${type}-flash show`;
+
+  // Allow reflow so transition plays
+  requestAnimationFrame(() => {
+    flashTimer = setTimeout(() => {
+      el.classList.add('fade');
+      flashTimer = setTimeout(() => {
+        el.className = 'answer-flash';
+      }, 450);
+    }, 120);
+  });
+}
+
+// ════════════════════════════════════════════════
+//  SUMMARY
+// ════════════════════════════════════════════════
+function goToSummary() {
+  if (currentExamIdx !== null) clearSession(currentExamIdx);
+  const disabled = getDisabled(currentExam.id);
+
+  document.getElementById('statAnswered').textContent = session.answered.size;
+  document.getElementById('statCorrect').textContent  = session.correct.size;
+  document.getElementById('statMissed').textContent   = session.wrong.size;
+  document.getElementById('statDisabled').textContent = disabled.size;
+
+  const missedList    = document.getElementById('missedList');
+  const missedSection = document.getElementById('missedSection');
+  missedList.innerHTML = '';
+
+  if (session.wrong.size === 0) {
+    missedSection.style.display = 'none';
+  } else {
+    missedSection.style.display = '';
+    [...session.wrong].forEach(origIdx => {
+      const card        = currentExam.cards[origIdx];
+      const correctText = correctTextFor(card);
+      const item        = document.createElement('div');
+      item.className    = 'missed-item';
+      item.innerHTML    = `
+        <div class="missed-q">${card.q}</div>
+        <div class="missed-answer">✓ ${correctText}</div>
+        ${card.explanation ? `<div class="missed-explanation">${card.explanation}</div>` : ''}`;
+      missedList.appendChild(item);
+    });
+  }
+
+  document.getElementById('btnRepeatMissed').disabled = session.wrong.size === 0;
+  showScreen('summary');
+}
+
+function goHome() {
+  if (currentExamIdx !== null) clearSession(currentExamIdx);
+  
+  showScreen('home');
+}
+
+function goBack() {
+  // Return to the subject screen for the current exam's subject
+  const subject = currentExam ? currentExam.subject : null;
+  // Note: session was already cleared in goToSummary; if called mid-session, preserve for resume
+  if (subject) {
+    goSubject(subject);
+  } else {
+    goHome();
+  }
+}
+
+function repeatMissed() {
+  startExam(currentExam.id, [...session.wrong]);
+}
+
+function repeatAll() {
+  const disabled = getDisabled(currentExam.id);
+  const all = currentExam.cards.map((_, i) => i).filter(i => !disabled.has(i));
+  startExam(currentExam.id, all);
+}
+
+// ════════════════════════════════════════════════
+//  SCREEN SWITCHER
+// ════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  // Scroll to top when switching screens
+  window.scrollTo(0, 0);
+}
+
+// ════════════════════════════════════════════════
+//  MODAL
+// ════════════════════════════════════════════════
+function openModal()  { document.getElementById('modalOverlay').classList.add('open'); }
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modalOverlay')) {
+    document.getElementById('modalOverlay').classList.remove('open');
+  }
+}
+
+// ════════════════════════════════════════════════
+//  KEYBOARD SHORTCUTS  (session only)
+// ════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('session').classList.contains('active')) return;
+  if (document.getElementById('modalOverlay').classList.contains('open')) {
+    if (e.key === 'Escape') closeModal();
+    return;
+  }
+
+  const entry = queue[queuePos];
+  if (!entry) return;
+  const choiceBtns = document.querySelectorAll('.choice');
+
+  switch (e.code) {
+    case 'Numpad1': case 'Numpad2': case 'Numpad3':
+    case 'Numpad4': case 'Numpad5': case 'Numpad6':
+    case 'Numpad7': case 'Numpad8': case 'Numpad9': {
+      const n = parseInt(e.code.replace('Numpad', '')) - 1;
+      if (n < choiceBtns.length && !choiceBtns[n].disabled) choiceBtns[n].click();
+      break;
+    }
+    case 'NumpadEnter': handleNext();    break;
+    case 'Numpad0':     handleForgot();  break;
+    case 'NumpadDecimal': handleDisable(); break;
+    // ── secondary (no-numpad) shortcuts ──
+    case 'Enter':       handleNext();    break;
+    case 'Quote':       handleForgot();  break;
+    case 'Semicolon':   handleDisable(); break;
+    case 'KeyO': { if (!choiceBtns[0]?.disabled) choiceBtns[0]?.click(); break; }
+    case 'KeyP': { if (!choiceBtns[1]?.disabled) choiceBtns[1]?.click(); break; }
+    case 'BracketLeft':  { if (!choiceBtns[2]?.disabled) choiceBtns[2]?.click(); break; }
+    case 'BracketRight': { if (!choiceBtns[3]?.disabled) choiceBtns[3]?.click(); break; }
+    case 'ArrowLeft':
+      e.preventDefault(); // FIX #11: prevent scroll
+      navigate(-1);
+      break;
+    case 'ArrowRight':
+      e.preventDefault();
+      navigate(1);
+      break;
+    case 'End':
+      goToSummary();
+      break;
+    case 'KeyS':
+      toggleStar();
+      break;
+  }
+});
+
+// ════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════
+// ════════════════════════════════════════════════
+//  LOADER — fetch all exam files then init
+// ════════════════════════════════════════════════
+(async function loadExams() {
+  document.getElementById('subjectGrid').innerHTML =
+    '<div style="color:var(--text-muted);font-size:0.9rem;padding:8px 0">Loading exams…</div>';
+
+  // Fetch manifest.json to get list of exam files
+  let examFiles = [];
+  try {
+    examFiles = await fetch('manifest.json?v=' + Date.now()).then(r => r.json());
+  } catch(e) {
+    console.error('Could not load manifest.json:', e);
+    document.getElementById('subjectGrid').innerHTML =
+      '<div style="color:var(--text-muted);font-size:0.9rem;padding:8px 0">Error: could not load manifest.json</div>';
+    return;
+  }
+
+  window.RAW_EXAMS_PENDING = [];
+
+  await Promise.all(examFiles.map(path => {
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = path + '?v=' + Date.now();
+      script.onload  = resolve;
+      script.onerror = () => {
+        console.warn('Could not load exam file:', path);
+        resolve();
+      };
+      document.head.appendChild(script);
+    });
+  }));
+
+  window.RAW_EXAMS_PENDING.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+  EXAMS = buildExams(window.RAW_EXAMS_PENDING);
+  renderHome();
+})();
+</script>
+</body>
+</html>
