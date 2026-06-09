@@ -389,5 +389,4 @@ Hirschsprung disease is >> A)
     * Hirschsprung disease results from absent ganglion cells (aganglionosis) in the distal bowel — classically the sigmoid — causing functional obstruction. Barium enema shows a narrow aganglionic segment with proximal dilation.
 `
 }
-];
 );
