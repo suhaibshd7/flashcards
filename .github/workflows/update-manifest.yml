@@ -17,7 +17,7 @@ jobs:
       - name: Generate manifest.json from exams folder
         run: |
           cd exams
-          printf '%s\n' *.js | jq -R -s -c 'split("\n") | map(select(length > 0))' > ../manifest.json
+          printf '%s\n' *.js | jq -R -s -c 'split("\n") | map(select(length > 0)) | map("exams/" + .)' > ../manifest.json
 
       - name: Commit if changed
         run: |
